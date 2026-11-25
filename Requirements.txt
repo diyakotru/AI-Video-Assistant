@@ -19,9 +19,11 @@ langchain>=0.2.0
 langchain-core>=0.2.0
 langchain-community>=0.2.0
 langchain-google-genai>=2.0.0      # LangChain wrapper for Gemini API
+langchain-text-splitters>=0.2.0   # Text splitters used by summarizer / vector store
 
 # ── RAG Pipeline ──────────────────────────────────────────────────────────────
 chromadb>=0.5.0                   # Local vector store
+langchain-chroma>=0.1.2           # LangChain ↔ Chroma bridge
 sentence-transformers>=3.0.0      # HuggingFace embedding models
 langchain-huggingface>=0.0.3      # LangChain ↔ HuggingFace embeddings bridge
 huggingface-hub>=0.23.0           # Model downloading from HuggingFace Hub
@@ -41,3 +43,4 @@ python-dotenv>=1.0.0              # Load API keys from .env
 numpy>=1.26.0
 tqdm>=4.66.0                      # Progress bars
 requests>=2.32.0
+imageio-ffmpeg>=0.5.1             # Bundled FFmpeg binary fallback if ffmpeg is not on PATH

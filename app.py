@@ -1,13 +1,16 @@
+import html
+import re
 import streamlit as st
 import time
 from dotenv import load_dotenv
+load_dotenv()  # must run before core/ imports read env vars
+
 from utils.audio_processor import process_input
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_action_items, extract_key_decisions, extract_questions
 from core.rag_engine import build_rag_chain, ask_question
 
-load_dotenv()
 
 # ─── Page Config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -315,6 +318,12 @@ for key, default in {
         st.session_state[key] = default
 
 # ─── Helpers ────────────────────────────────────────────────────────────────────
+def fmt(text) -> str:
+    """Escape text for safe use inside HTML, keep line breaks and **bold**."""
+    safe = html.escape(str(text or ""))
+    safe = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", safe)
+    return safe.replace("\n", "<br>")
+
 def step_status(steps: dict, key: str) -> str:
     s = steps.get(key, "pending")
     if s == "active":  return "dot-active"
@@ -435,7 +444,7 @@ if st.session_state.result:
     <div class="card">
         <div class="card-title">📌 Session Title</div>
         <div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:700;color:var(--text)">
-            {r['title']}
+            {fmt(r['title'])}
         </div>
     </div>""", unsafe_allow_html=True)
 
@@ -446,12 +455,12 @@ if st.session_state.result:
         st.markdown(f"""
         <div class="card">
             <div class="card-title">📋 Summary</div>
-            <div class="card-content">{r['summary']}</div>
+            <div class="card-content">{fmt(r['summary'])}</div>
         </div>""", unsafe_allow_html=True)
 
     with col2:
         with st.expander("📝 Full Transcript", expanded=False):
-            st.markdown(f'<div class="transcript-box">{r["transcript"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="transcript-box">{html.escape(r["transcript"])}</div>', unsafe_allow_html=True)
 
     # Second row: action items | decisions | questions
     c1, c2, c3 = st.columns(3, gap="medium")
@@ -460,21 +469,21 @@ if st.session_state.result:
         st.markdown(f"""
         <div class="card">
             <div class="card-title">✅ Action Items</div>
-            <div class="card-content">{r['action_items']}</div>
+            <div class="card-content">{fmt(r['action_items'])}</div>
         </div>""", unsafe_allow_html=True)
 
     with c2:
         st.markdown(f"""
         <div class="card">
             <div class="card-title">🔑 Key Decisions</div>
-            <div class="card-content">{r['key_decisions']}</div>
+            <div class="card-content">{fmt(r['key_decisions'])}</div>
         </div>""", unsafe_allow_html=True)
 
     with c3:
         st.markdown(f"""
         <div class="card">
             <div class="card-title">❓ Open Questions</div>
-            <div class="card-content">{r['open_questions']}</div>
+            <div class="card-content">{fmt(r['open_questions'])}</div>
         </div>""", unsafe_allow_html=True)
 
     st.markdown("---")
@@ -490,13 +499,13 @@ if st.session_state.result:
                 chat_html += f"""
                 <div class="chat-msg" style="align-items:flex-end">
                     <span class="chat-label user-label">You</span>
-                    <div class="chat-bubble user-bubble">{msg['content']}</div>
+                    <div class="chat-bubble user-bubble">{fmt(msg['content'])}</div>
                 </div>"""
             else:
                 chat_html += f"""
                 <div class="chat-msg" style="align-items:flex-start">
                     <span class="chat-label bot-label">🤖 Assistant</span>
-                    <div class="chat-bubble bot-bubble">{msg['content']}</div>
+                    <div class="chat-bubble bot-bubble">{fmt(msg['content'])}</div>
                 </div>"""
         chat_html += '</div>'
         st.markdown(chat_html, unsafe_allow_html=True)

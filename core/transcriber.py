@@ -1,5 +1,6 @@
 import whisper
 import os
+import numpy as np
 import requests
 from pydub import AudioSegment
 
@@ -8,12 +9,21 @@ from pydub import AudioSegment
 SARVAM_PIECE_SECONDS = 25
 
 
-WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
-
-
-SARVAM_API_KEY = os.getenv("SARVAM_API_KEY")
 SARVAM_STT_TRANSLATE_URL = "https://api.sarvam.ai/speech-to-text-translate"
-SARVAM_MODEL = os.getenv("SARVAM_STT_MODEL", "saaras:v2.5")
+
+
+# Read env vars lazily so values from .env are picked up even if
+# load_dotenv() runs after this module is imported.
+def _whisper_model_name() -> str:
+    return os.getenv("WHISPER_MODEL", "small")
+
+
+def _sarvam_api_key():
+    return os.getenv("SARVAM_API_KEY")
+
+
+def _sarvam_model() -> str:
+    return os.getenv("SARVAM_STT_MODEL", "saaras:v2.5")
 
 _model = None
 
@@ -23,8 +33,9 @@ def load_model():
     global _model  
 
     if _model is None: 
-        print(f"Loading Whisper model: {WHISPER_MODEL} ...")
-        _model = whisper.load_model(WHISPER_MODEL) 
+        name = _whisper_model_name()
+        print(f"Loading Whisper model: {name} ...")
+        _model = whisper.load_model(name)
         print("Whisper model loaded.")
     return _model 
 
@@ -33,17 +44,23 @@ def transcribe_chunk_whisper(chunk_path: str) -> str:
 
     model = load_model()  
 
-    result = model.transcribe(chunk_path, task="transcribe")  
+    # Load the WAV ourselves (16 kHz mono float32) so Whisper doesn't need
+    # an `ffmpeg` executable on PATH.
+    audio = AudioSegment.from_wav(chunk_path).set_channels(1).set_frame_rate(16000).set_sample_width(2)
+    samples = np.array(audio.get_array_of_samples(), dtype=np.float32) / 32768.0
+    if samples.size == 0:
+        return ""
+    result = model.transcribe(samples, task="transcribe", fp16=False)
     return result["text"]  
 
 
 def _send_to_sarvam(piece_path: str) -> str:
     """Send one ≤30s WAV file to Sarvam and return the English transcript."""
-    headers = {"api-subscription-key": SARVAM_API_KEY}
+    headers = {"api-subscription-key": _sarvam_api_key()}
 
     with open(piece_path, "rb") as f:
         files = {"file": (os.path.basename(piece_path), f, "audio/wav")}
-        data = {"model": SARVAM_MODEL, "with_diarization": "false"}
+        data = {"model": _sarvam_model(), "with_diarization": "false"}
         response = requests.post(
             SARVAM_STT_TRANSLATE_URL,
             headers=headers,
@@ -65,7 +82,7 @@ def transcribe_chunk_sarvam(chunk_path: str) -> str:
     Sarvam sync API only accepts ≤30s audio. We split this chunk into
     25-second pieces, send each separately, and join the transcripts.
     """
-    if not SARVAM_API_KEY:
+    if not _sarvam_api_key():
         raise RuntimeError("SARVAM_API_KEY is not set in environment / .env")
 
     audio = AudioSegment.from_wav(chunk_path)

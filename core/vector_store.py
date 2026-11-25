@@ -1,6 +1,6 @@
 import os 
 from langchain_chroma import Chroma 
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
@@ -28,7 +28,19 @@ def build_vector_store(transcript : str)->Chroma:
         for i,chunk in enumerate(chunks)
     ]
 
+    if not docs:
+        raise ValueError("Transcript is empty — nothing to index for RAG.")
+
     embeddings = get_embeddings()
+
+    # Drop the previous meeting's chunks so the chat only sees this transcript.
+    old_store = Chroma(
+        collection_name=COLLECTION_NAME,
+        embedding_function=embeddings,
+        persist_directory=CHROMA_DIR,
+    )
+    old_store.delete_collection()
+
     vector_store = Chroma.from_documents(
         documents= docs,
         embedding=embeddings,
