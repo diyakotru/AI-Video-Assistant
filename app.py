@@ -330,13 +330,27 @@ def step_status(steps: dict, key: str) -> str:
     if s == "done":    return "dot-done"
     return "dot-pending"
 
-def render_step_bar(label: str, key: str, icon: str):
-    css = step_status(st.session_state.pipeline_steps, key)
-    st.markdown(f"""
-    <div class="status-bar">
-        <div class="status-dot {css}"></div>
-        <span>{icon} {label}</span>
-    </div>""", unsafe_allow_html=True)
+PIPELINE_STEPS = [
+    ("audio",      "🔊", "Audio Processing"),
+    ("transcript", "📝", "Transcription"),
+    ("title",      "🏷️", "Title Generation"),
+    ("summary",    "📋", "Summarisation"),
+    ("extract",    "🔍", "Extraction"),
+    ("rag",        "🧠", "RAG Engine"),
+]
+
+def render_status(slot):
+    """Render the pipeline status list into a placeholder (re-callable for live updates)."""
+    steps = st.session_state.pipeline_steps
+    bars = "".join(
+        f'<div class="status-bar"><div class="status-dot {step_status(steps, key)}"></div>'
+        f'<span>{icon} {label}</span></div>'
+        for key, icon, label in PIPELINE_STEPS
+    )
+    slot.markdown(
+        '<hr><span class="badge badge-green">Pipeline Status</span>' + bars,
+        unsafe_allow_html=True,
+    )
 
 # ─── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -351,18 +365,9 @@ with st.sidebar:
 
     run_btn = st.button("⚡  Analyse", use_container_width=True)
 
-    if st.session_state.pipeline_done:
-        st.markdown("---")
-        st.markdown('<span class="badge badge-green">Pipeline Status</span>', unsafe_allow_html=True)
-        for step, icon, label in [
-            ("audio",      "🔊", "Audio Processing"),
-            ("transcript", "📝", "Transcription"),
-            ("title",      "🏷️", "Title Generation"),
-            ("summary",    "📋", "Summarisation"),
-            ("extract",    "🔍", "Extraction"),
-            ("rag",        "🧠", "RAG Engine"),
-        ]:
-            render_step_bar(label, step, icon)
+    status_slot = st.empty()
+    if st.session_state.pipeline_done or st.session_state.pipeline_steps:
+        render_status(status_slot)
 
 # ─── Main Area ──────────────────────────────────────────────────────────────────
 st.markdown('<div class="hero-title">AI Video Assistant</div>', unsafe_allow_html=True)
@@ -383,10 +388,12 @@ if run_btn:
 
         def update_step(key, state):
             st.session_state.pipeline_steps[key] = state
+            render_status(status_slot)
 
         try:
             with progress_placeholder.container():
-                st.info("⚙️ Pipeline running — see sidebar for live status…")
+                st.info("⚙️ Pipeline running — see sidebar for live status… "
+                        "(transcription on CPU takes a few minutes per 10 min of audio)")
 
             update_step("audio", "active")
             chunks = process_input(source)
@@ -433,6 +440,7 @@ if run_btn:
             for k in ["audio","transcript","title","summary","extract","rag"]:
                 if st.session_state.pipeline_steps.get(k) == "active":
                     st.session_state.pipeline_steps[k] = "pending"
+            render_status(status_slot)
             progress_placeholder.error(f"❌ Error: {e}")
 
 # ── Results ──────────────────────────────────────────────────────────────────────

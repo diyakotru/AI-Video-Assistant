@@ -7,8 +7,9 @@ from core.vector_store import build_vector_store, load_vector_store, get_retriev
 
 def get_llm():
     return ChatGoogleGenerativeAI(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
         google_api_key=os.getenv("GEMINI_API_KEY"),
+        max_retries=3,  # retry transient rate-limit / overload errors
         temperature=0.3,
     )
 

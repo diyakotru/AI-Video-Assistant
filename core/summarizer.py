@@ -8,16 +8,17 @@ import os
 
 def get_llm():
     return ChatGoogleGenerativeAI(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
         google_api_key=os.getenv("GEMINI_API_KEY"),
+        max_retries=3,  # retry transient rate-limit / overload errors
         temperature=0.3,
     )
 
 
 def split_transcript(transcript: str) -> list:
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size = 3000,
-        chunk_overlap = 200
+        chunk_size = 200_000,  # Gemini has a ~1M-token context; big chunks = far fewer API calls
+        chunk_overlap = 500
     )
 
     return splitter.split_text(transcript)
